@@ -6,25 +6,11 @@ Graphical object viewer
 
 ## Requirements
 
-### Qt.py
-
-```pip install Qt.py```
-
-or
-
-Put [Qt.py](https://raw.githubusercontent.com/mottosso/Qt.py/master/Qt.py) into ```$PYTHONPATH``` or IDA plugins directory.
-
-### Notz
-
-It will be cloned automatically.
+No dependencies.
 
 ## Installation
 
-```
-git clone --recursive https://github.com/Ga-ryo/IDAObjectViewer 
-```
-
-Put ```ida_object_viewer.py``` and ```Nodz``` directory into plugins directory.
+Put ```ida_object_viewer.py``` into plugins directory.
 
 ## Settings
 
