@@ -1093,7 +1093,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         :return:
         """
 
-        w = self.baseWidth
+        w = self.baseWidth #min width
         for attr in self.attrs:
             w = max(w,self._attrFontMetrics.width(attr)+self.radius*2+self.border)
         return w
@@ -1696,14 +1696,14 @@ class PlugItem(SlotItem):
         The bounding rect based on the width and height variables.
 
         """
-        width = height = self.parentItem().attrHeight / 2.0
+        width = height = self.parentItem().attrHeight / 4.0
 
         nodzInst = self.scene().views()[0]
         config = nodzInst.config
 
         x = self.parentItem().width - (width / 2.0)
         y = (self.parentItem().baseHeight - config['node_radius'] +
-             self.parentItem().attrHeight / 4 +
+             self.parentItem().attrHeight * (3.0/8.0) +
              self.parentItem().attrs.index(self.attribute) * self.parentItem().attrHeight)
 
         rect = QtCore.QRectF(QtCore.QRect(x, y, width, height))
@@ -1817,14 +1817,14 @@ class SocketItem(SlotItem):
         The bounding rect based on the width and height variables.
 
         """
-        width = height = self.parentItem().attrHeight / 2.0
+        width = height = self.parentItem().attrHeight / 4.0
 
         nodzInst = self.scene().views()[0]
         config = nodzInst.config
 
         x = - width / 2.0
         y = (self.parentItem().baseHeight - config['node_radius'] +
-            (self.parentItem().attrHeight/4) +
+             self.parentItem().attrHeight * (3.0 / 8.0) +
              self.parentItem().attrs.index(self.attribute) * self.parentItem().attrHeight )
 
         rect = QtCore.QRectF(QtCore.QRect(x, y, width, height))
