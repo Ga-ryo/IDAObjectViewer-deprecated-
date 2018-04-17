@@ -1087,6 +1087,18 @@ class NodeItem(QtWidgets.QGraphicsItem):
             return self.baseHeight
 
     @property
+    def width(self):
+        """
+        Calculate width dynamically.
+        :return:
+        """
+
+        w = self.baseWidth
+        for attr in self.attrs:
+            w = max(w,self._attrFontMetrics.width(attr)+self.radius*2+self.border)
+        return w
+
+    @property
     def pen(self):
         """
         Return the pen based on the selection state of the node.
@@ -1114,7 +1126,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         self.radius = config['node_radius']
 
         self.nodeCenter = QtCore.QPointF()
-        self.nodeCenter.setX(self.baseWidth / 2.0)
+        self.nodeCenter.setX(self.width / 2.0)
         self.nodeCenter.setY(self.height / 2.0)
 
         self._brush = QtGui.QBrush()
@@ -1137,6 +1149,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
 
         self._nodeTextFont = QtGui.QFont(config['node_font'], config['node_font_size'], QtGui.QFont.Bold)
         self._attrTextFont = QtGui.QFont(config['attr_font'], config['attr_font_size'], QtGui.QFont.Normal)
+        self._attrFontMetrics = QtGui.QFontMetrics(self._attrTextFont)
 
         self._attrBrush = QtGui.QBrush()
         self._attrBrush.setStyle(QtCore.Qt.SolidPattern)
@@ -1288,7 +1301,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         The bounding rect based on the width and height variables.
 
         """
-        rect = QtCore.QRect(0, 0, self.baseWidth, self.height)
+        rect = QtCore.QRect(0, 0, self.width, self.height)
         rect = QtCore.QRectF(rect)
         return rect
 
@@ -1311,7 +1324,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
         painter.setPen(self.pen)
 
         painter.drawRoundedRect(0, 0,
-                                self.baseWidth,
+                                self.width,
                                 self.height,
                                 self.radius,
                                 self.radius)
@@ -1343,7 +1356,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
             # Attribute rect.
             rect = QtCore.QRect(self.border / 2,
                                 self.baseHeight - self.radius + offset,
-                                self.baseWidth - self.border,
+                                self.width - self.border,
                                 self.attrHeight)
 
 
@@ -1414,7 +1427,7 @@ class NodeItem(QtWidgets.QGraphicsItem):
             if self.scene().views()[0].gridSnapToggle or self.scene().views()[0]._nodeSnap:
                 gridSize = self.scene().gridSize
 
-                currentPos = self.mapToScene(event.pos().x() - self.baseWidth / 2,
+                currentPos = self.mapToScene(event.pos().x() - self.width / 2,
                                              event.pos().y() - self.height / 2)
 
                 snap_x = (round(currentPos.x() / gridSize) * gridSize) - gridSize/4
@@ -1688,7 +1701,7 @@ class PlugItem(SlotItem):
         nodzInst = self.scene().views()[0]
         config = nodzInst.config
 
-        x = self.parentItem().baseWidth - (width / 2.0)
+        x = self.parentItem().width - (width / 2.0)
         y = (self.parentItem().baseHeight - config['node_radius'] +
              self.parentItem().attrHeight / 4 +
              self.parentItem().attrs.index(self.attribute) * self.parentItem().attrHeight)
@@ -2269,7 +2282,7 @@ nodz.signal_KeyPressed.connect(on_keyPressed)
 # Node A
 nodeA = nodz.createNode(name='nodeA', preset='node_preset_1', position=None)
 
-nodz.createAttribute(node=nodeA, name='Aattr1', index=-1, preset='attr_preset_1',
+nodz.createAttribute(node=nodeA, name='Aattr1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABCD', index=-1, preset='attr_preset_1',
                      plug=True, socket=False, dataType=str)
 
 nodz.createAttribute(node=nodeA, name='Aattr2', index=-1, preset='attr_preset_1',
