@@ -1,4 +1,6 @@
 from PyQt5 import QtGui, QtCore, QtWidgets
+import idaapi
+
 
 ############################################################################################################################
 ##############################################   nodz_util.py   ############################################################
@@ -2101,88 +2103,6 @@ class ConnectionItem(QtWidgets.QGraphicsPathItem):
 ############################################################################################################################
 
 
-try:
-    app = QtWidgets.QApplication([])
-except:
-    # I guess we're running somewhere that already has a QApp created
-    app = None
-
-config_s = {
-    "scene_width": 2000,
-    "scene_height": 2000,
-    "grid_size": 36,
-    "antialiasing": True,
-    "antialiasing_boost": True,
-    "smooth_pixmap": True,
-
-    "node_font": "Arial",
-    "node_font_size": 12,
-    "attr_font": "Arial",
-    "attr_font_size": 10,
-    "mouse_bounding_box": 80,
-
-    "node_width": 200,
-    "node_height": 25,
-    "node_radius": 10,
-    "node_border": 2,
-    "node_attr_height": 30,
-    "connection_width": 2,
-
-    "alternate_value": 20,
-    "grid_color": [50, 50, 50, 255],
-    "slot_border": [50, 50, 50, 255],
-    "non_connectable_color": [100, 100, 100, 255],
-    "connection_color": [255, 155, 0, 255],
-
-    "node_default": {
-        "bg": [130, 130, 130, 255],
-        "border": [50, 50, 50, 255],
-        "border_sel": [250, 250, 250, 255],
-        "text": [255, 255, 255, 255]
-    },
-
-    "attr_default": {
-        "bg": [160, 160, 160, 255],
-        "text": [220, 220, 220, 255],
-        "plug": [255, 155, 0, 255],
-        "socket": [255, 155, 0, 255]
-    },
-
-    "node_preset_1": {
-        "bg": [80, 80, 80, 255],
-        "border": [50, 50, 50, 255],
-        "border_sel": [170, 80, 80, 255],
-        "text": [230, 230, 230, 255]
-    },
-
-    "attr_preset_1": {
-        "bg": [60, 60, 60, 255],
-        "text": [220, 220, 220, 255],
-        "plug": [255, 155, 0, 255],
-        "socket": [255, 155, 0, 255]
-    },
-
-    "attr_preset_2":{
-        "bg": [250, 120, 120, 255],
-        "text": [220, 220, 220, 255],
-        "plug": [255, 155, 0, 255],
-        "socket": [255, 155, 0, 255]
-    },
-
-    "attr_preset_3":{
-        "bg": [160, 160, 160, 255],
-        "text": [220, 220, 220, 255],
-        "plug": [255, 155, 0, 255],
-        "socket": [255, 155, 0, 255]
-    }
-}
-
-
-nodz = Nodz(None,config_s)
-nodz.initialize()
-nodz.show()
-
-
 ######################################################################
 # Test signals
 ######################################################################
@@ -2252,8 +2172,87 @@ def on_graphEvaluated():
 def on_keyPressed(key):
     print 'key pressed : ', key
 
+def object_view_main():
+    '''
+    try:
+        app = QtWidgets.QApplication([]) # IDA Pro will crash when attempt to create QApplication
+    except:
+        # I guess we're running somewhere that already has a QApp created
+        app = None
+    '''
+    config_s = {
+        "scene_width": 2000,
+        "scene_height": 2000,
+        "grid_size": 36,
+        "antialiasing": True,
+        "antialiasing_boost": True,
+        "smooth_pixmap": True,
 
-def main():
+        "node_font": "Arial",
+        "node_font_size": 12,
+        "attr_font": "Arial",
+        "attr_font_size": 10,
+        "mouse_bounding_box": 80,
+
+        "node_width": 200,
+        "node_height": 25,
+        "node_radius": 10,
+        "node_border": 2,
+        "node_attr_height": 30,
+        "connection_width": 2,
+
+        "alternate_value": 20,
+        "grid_color": [50, 50, 50, 255],
+        "slot_border": [50, 50, 50, 255],
+        "non_connectable_color": [100, 100, 100, 255],
+        "connection_color": [255, 155, 0, 255],
+
+        "node_default": {
+            "bg": [130, 130, 130, 255],
+            "border": [50, 50, 50, 255],
+            "border_sel": [250, 250, 250, 255],
+            "text": [255, 255, 255, 255]
+        },
+
+        "attr_default": {
+            "bg": [160, 160, 160, 255],
+            "text": [220, 220, 220, 255],
+            "plug": [255, 155, 0, 255],
+            "socket": [255, 155, 0, 255]
+        },
+
+        "node_preset_1": {
+            "bg": [80, 80, 80, 255],
+            "border": [50, 50, 50, 255],
+            "border_sel": [170, 80, 80, 255],
+            "text": [230, 230, 230, 255]
+        },
+
+        "attr_preset_1": {
+            "bg": [60, 60, 60, 255],
+            "text": [220, 220, 220, 255],
+            "plug": [255, 155, 0, 255],
+            "socket": [255, 155, 0, 255]
+        },
+
+        "attr_preset_2": {
+            "bg": [250, 120, 120, 255],
+            "text": [220, 220, 220, 255],
+            "plug": [255, 155, 0, 255],
+            "socket": [255, 155, 0, 255]
+        },
+
+        "attr_preset_3": {
+            "bg": [160, 160, 160, 255],
+            "text": [220, 220, 220, 255],
+            "plug": [255, 155, 0, 255],
+            "socket": [255, 155, 0, 255]
+        }
+    }
+
+    nodz = Nodz(None, config_s) #will close immediately. fix it.(set parent?)
+    nodz.initialize()
+    nodz.show()
     nodz.signal_NodeCreated.connect(on_nodeCreated)
     nodz.signal_NodeDeleted.connect(on_nodeDeleted)
     nodz.signal_NodeEdited.connect(on_nodeEdited)
@@ -2347,21 +2346,76 @@ def main():
 
     # Attributes Deletion
     nodz.deleteAttribute(node=nodeC, index=-1)
-
-
     # Nodes Edition
     nodz.editNode(node=nodeC, newName='newNodeName')
-
     # Nodes Deletion
     nodz.deleteNode(node=nodeC)
-
-
     # Graph
     print nodz.evaluateGraph()
 
-
-
-
+    '''
     if app:
         # command line stand alone test... run our own event loop
         app.exec_()
+    '''
+
+
+class object_viewer_handler(idaapi.action_handler_t):
+    def __init__(self):
+        idaapi.action_handler_t.__init__(self)
+
+    def activate(self, ctx):
+        try:
+            action = object_view_main()
+        except Exception as e:
+            print(e)
+        return 1
+
+    def update(self, ctx):
+        return idaapi.AST_ENABLE_ALWAYS
+
+class UIHook(idaapi.UI_Hooks):
+    def __init__(self):
+        idaapi.UI_Hooks.__init__(self)
+
+    def finish_populating_tform_popup(self, form, popup):
+        form_type = idaapi.get_tform_type(form)
+
+        if form_type == idaapi.BWN_DISASM or form_type == idaapi.BWN_DUMP:
+            idaapi.attach_action_to_popup(form, popup, "Object View", None)
+
+class ObjectViewerPlugin(idaapi.plugin_t):
+    flags = idaapi.PLUGIN_FIX | idaapi.PLUGIN_HIDE
+    comment = "Graphical object viewer for IDA"
+    help = ""
+    wanted_name = "IDAObjectViewer"
+    wanted_hotkey = ""
+
+    def init(self):
+
+        global bits
+        info = idaapi.get_inf_structure()
+        if info.is_64bit():
+            bits = 64
+        elif info.is_32bit():
+            bits = 32
+        else:
+            bits = 16 #not tested
+
+        print "Object Viewer Plugin loaded."
+        self.ui_hook = UIHook()
+        self.ui_hook.hook()
+        self.action = idaapi.action_desc_t("Object View", "Object View", object_viewer_handler(), "")
+        idaapi.register_action(self.action)
+        return idaapi.PLUGIN_KEEP
+
+    def run(self, arg):
+        pass
+
+    def term(self):
+        self.ui_hook.unhook()
+        idaapi.unregister_action("Object View")
+        pass
+
+def PLUGIN_ENTRY():
+    return ObjectViewerPlugin()
