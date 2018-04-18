@@ -23,3 +23,9 @@ Directly change param in ida_object_viewer.py
 Right click on the value then click "Open Object viewer".
 
 + TODO : gif image
+
+## TODO
+
+avoid collision and adjust the layout automatically
+import color setting from IDA.
+add double click action (goto address)
