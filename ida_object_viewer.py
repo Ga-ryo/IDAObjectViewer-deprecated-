@@ -1,6 +1,7 @@
 from PyQt5 import QtGui, QtCore, QtWidgets
 import idaapi
 
+nodz = None
 
 ############################################################################################################################
 ##############################################   nodz_util.py   ############################################################
@@ -573,6 +574,7 @@ class Nodz(QtWidgets.QGraphicsView):
 
         # Setup scene.
         scene = NodeScene(self)
+
         sceneWidth = config['scene_width']
         sceneHeight = config['scene_height']
         scene.setSceneRect(0, 0, sceneWidth, sceneHeight)
@@ -1205,7 +1207,6 @@ class NodeItem(QtWidgets.QGraphicsItem):
                                 index=self.attrCount,
                                 preset=preset,
                                 dataType=dataType)
-
             self.plugs[name] = plugInst
 
         # Create a socket connection item.
@@ -1674,7 +1675,6 @@ class PlugItem(SlotItem):
 
         """
         super(PlugItem, self).__init__(parent, attribute, preset, index, dataType)
-
         # Storage.
         self.attributte = attribute
         self.preset = preset
@@ -1795,8 +1795,8 @@ class SocketItem(SlotItem):
 
         """
         super(SocketItem, self).__init__(parent, attribute, preset, index, dataType)
-
         # Storage.
+
         self.attributte = attribute
         self.preset = preset
         self.slotType = 'socket'
@@ -2249,8 +2249,11 @@ def object_view_main():
             "socket": [255, 155, 0, 255]
         }
     }
-
+    #mainwindow = [x for x in QtWidgets.QApplication.topLevelWidgets() if type(x) == QtWidgets.QMainWindow][0]
+    global nodz #VERY IMPORTANT!!!!
+    #nodz = Nodz(mainwindow, config_s) #will close immediately. fix it.(set parent?)
     nodz = Nodz(None, config_s) #will close immediately. fix it.(set parent?)
+
     nodz.initialize()
     nodz.show()
     nodz.signal_NodeCreated.connect(on_nodeCreated)
@@ -2352,6 +2355,7 @@ def object_view_main():
     nodz.deleteNode(node=nodeC)
     # Graph
     print nodz.evaluateGraph()
+
 
     '''
     if app:
