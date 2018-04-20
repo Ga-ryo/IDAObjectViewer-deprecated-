@@ -1,5 +1,6 @@
 from PyQt5 import QtGui, QtCore, QtWidgets
 import idaapi
+import ida_kernwin
 
 nodz = None
 
@@ -2278,6 +2279,19 @@ def object_view_main():
 
     nodz.signal_KeyPressed.connect(on_keyPressed)
 
+    name,flag = ida_kernwin.get_highlight(ida_kernwin.get_current_widget())
+    #check if debugger is active
+    if flag == 1:
+        #name is register name (e.g. RAX)
+        try:
+            address = idc.get_reg_value(name)
+        except:
+            address = idc.BADADDR
+    else:
+        #maybe flag = 3 (what's 2?)
+        address = ida_kernwin.str2ea(name)
+
+
     # Node A
     nodeA = nodz.createNode(name='nodeA', preset='node_preset_1', position=None)
 
@@ -2355,6 +2369,7 @@ def object_view_main():
     nodz.deleteNode(node=nodeC)
     # Graph
     print nodz.evaluateGraph()
+    print
 
 
     '''
@@ -2379,13 +2394,14 @@ class object_viewer_handler(idaapi.action_handler_t):
         return idaapi.AST_ENABLE_ALWAYS
 
 class UIHook(idaapi.UI_Hooks):
+    form_type_list = [idaapi.BWN_DISASM,idaapi.BWN_DUMP,idaapi.BWN_NAMES,idaapi.BWN_PSEUDOCODE,idaapi.BWN_STACK,idaapi.BWN_STKVIEW,idaapi.BWN_STRINGS]
     def __init__(self):
         idaapi.UI_Hooks.__init__(self)
 
     def finish_populating_tform_popup(self, form, popup):
         form_type = idaapi.get_tform_type(form)
 
-        if form_type == idaapi.BWN_DISASM or form_type == idaapi.BWN_DUMP:
+        if form_type in self.form_type_list:
             idaapi.attach_action_to_popup(form, popup, "Object View", None)
 
 class ObjectViewerPlugin(idaapi.plugin_t):
