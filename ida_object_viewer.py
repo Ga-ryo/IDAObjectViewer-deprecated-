@@ -1,8 +1,14 @@
 from PyQt5 import QtGui, QtCore, QtWidgets
 import idaapi
 import ida_kernwin
+import idc
+import re
 
 nodz = None
+max_depth = 2 #TEMP
+pattern = '^[ ]*(struct[ ]+)?'
+pat = re.compile(pattern)
+
 
 ############################################################################################################################
 ##############################################   nodz_util.py   ############################################################
@@ -2173,7 +2179,54 @@ def on_graphEvaluated():
 def on_keyPressed(key):
     print 'key pressed : ', key
 
+class CObject(object):
+    global nodz, max_depth
+
+    def __init__(self, address, size, struct_name, struct_id):
+        self.address = address
+        self.size = size
+        self.members = []
+        self.struct_name = struct_name
+        self.struct_id = struct_id
+
+
+    def is_contain(self, address):
+        if self.address <= address and self.address + self.size >= address:
+            return True
+        return False
+
+    def show(self, depth):
+        if max_depth <= depth:
+            return
+        #if link exists link.show(depth+1)
+        pass
+
 def object_view_main():
+    name,flag = ida_kernwin.get_highlight(ida_kernwin.get_current_widget())
+    #check if debugger is active
+    if flag == 3:
+        #name is register name (e.g. RAX)
+        try:
+            address = idc.get_reg_value(name)
+        except:
+            address = idc.BADADDR
+    else:
+        #maybe flag == 1 (what's 2?)
+        address = ida_kernwin.str2ea(name)
+    s = idc.get_type(address)
+    if not s:
+        s = ''
+    struct_name = ida_kernwin.ask_str(s, 0, "Type struct")
+    if not struct_name:
+        return
+    '''
+    struct struc_1 -> struc_1
+    struc_1 ->  struc_1
+    '''
+    struct_name = re.sub(pat, '', struct_name)
+    struct_id = idaapi.get_struc_id(struct_name)
+
+
     '''
     try:
         app = QtWidgets.QApplication([]) # IDA Pro will crash when attempt to create QApplication
@@ -2278,20 +2331,6 @@ def object_view_main():
     nodz.signal_GraphEvaluated.connect(on_graphEvaluated)
 
     nodz.signal_KeyPressed.connect(on_keyPressed)
-
-    name,flag = ida_kernwin.get_highlight(ida_kernwin.get_current_widget())
-    #check if debugger is active
-    if flag == 1:
-        #name is register name (e.g. RAX)
-        try:
-            address = idc.get_reg_value(name)
-        except:
-            address = idc.BADADDR
-    else:
-        #maybe flag = 3 (what's 2?)
-        address = ida_kernwin.str2ea(name)
-
-
     # Node A
     nodeA = nodz.createNode(name='nodeA', preset='node_preset_1', position=None)
 
