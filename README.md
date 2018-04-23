@@ -29,8 +29,9 @@ Right click on the value then click "Open Object viewer".
 avoid collision and adjust the layout automatically
 import color setting from IDA.
 add double click action (goto address)
+add test data.
 
-hanle
+handle
 normal struct
 list
 pointer

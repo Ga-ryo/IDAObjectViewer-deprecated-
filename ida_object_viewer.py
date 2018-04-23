@@ -1,13 +1,23 @@
 from PyQt5 import QtGui, QtCore, QtWidgets
+import struct
 import idaapi
 import ida_kernwin
 import idc
+import idautils
 import re
 
 nodz = None
 max_depth = 2 #TEMP
+#TODO hook debugger activate event?
+dbg_active = False
+"""
+struct struc_1 -> struc_1
+struc_1 ->  struc_1
+"""
 pattern = '^[ ]*(struct[ ]+)?'
 pat = re.compile(pattern)
+bits = 0
+endian = 'little'
 
 
 ############################################################################################################################
@@ -2179,29 +2189,138 @@ def on_graphEvaluated():
 def on_keyPressed(key):
     print 'key pressed : ', key
 
-class CObject(object):
-    global nodz, max_depth
+def u(value):
+    global bits,endian
+    if endian == 'big':
+        e = ">"
+    else:
+        e = "<"
+    if bits == 16:
+        return struct.unpack(e+"H", value)[0]
+    elif bits == 32:
+        return struct.unpack(e+"I", value)[0]
+    elif bits == 64:
+        return struct.unpack(e+"Q", value)[0]
 
-    def __init__(self, address, size, struct_name, struct_id):
+
+class NotDefinedObjectException(Exception):
+    def __init__(self, msg):
+        super(NotDefinedObjectException, self).__init__(msg)
+
+
+class CMember(object):
+    global bits, pat
+
+    def __init__(self, address, offset, name, size, flag, member_id, parent=None):
         self.address = address
+        self.offset = offset
+        self.name = name
         self.size = size
-        self.members = []
-        self.struct_name = struct_name
-        self.struct_id = struct_id
+        self.flag = flag
+        self.member_id = member_id
+        self.type = idc.get_type(self.member_id)
+        self.is_array = False
+        self.parent = parent
+        # even if use_dbg=False, get_bytes read memory from debugger. TODO check if this is true.
+        if self.type is None:
+            # Didn't defined type explicitly.
 
+            # Default value is integer(size=1,2,4,8).
+            if (idc.is_byte(self.flag) and self.size == 1) or (idc.is_word(self.flag) and self.size == 2) or (idc.is_dword(self.flag) and self.size == 4) or (idc.is_qword(self.flag) and self.size == 8):
+                self.value = u(idc.get_bytes(address, size, False).ljust(bits/8, '\0'))
+            else:
+                # maybe list
+                # TODO handle correctly if type isn't array (enum, bitfield, ...)
+                if idc.is_enum0(self.flag) or idc.is_bf(self.flag):
+                    raise Exception("Not implemented")
+                self.is_array = True
+                self.value = idc.get_bytes(address, size, False)
+        else:
+            self.type = re.sub(pat, '', self.type)
+            # Struct or type defined explicitly.
+            self.value = idc.get_bytes(address, size, False)
+        # TODO
+        # if self.is_ptr() -> Find CMember to which it points.(via CObjectManager?)
+
+    @property
+    def is_ptr(self):
+        return idc.is_off0(self.flag)
+
+    @property
+    def is_struct(self):
+        return idc.is_struct(self.flag)
+
+    def __repr__(self):
+        # Do you want type name?
+        # TODO if string, preview string?
+        if type(self.value) == int:
+            return self.name + ' ' + ("0x{0:0" + str(self.size * 2) + "x}").format(self.value)
+        else:
+            return self.name + ' ' + "PREVIEW"
+
+
+class CObject(object):
+    global nodz
+
+    def __init__(self, address, struct_name):
+        self.address = address
+        self.members = []
+        self.struct_name = re.sub(pat, '', struct_name)
+        self.struct_id = idaapi.get_struc_id(self.struct_name)
+        self.size = idc.get_struc_size(self.struct_id)
+        self.node = nodz.createNode(name=self.struct_name+'@'+hex(self.address), preset='node_preset_1', position=None)
+        if self.struct_id == idc.BADADDR:
+            raise NotDefinedObjectException(self.struct_name + ' isn\'t defined. Please insert into structure window.')
+        if idc.is_union(self.struct_id):
+            raise NotDefinedObjectException("Union Not supported now.")
+        for member in idautils.StructMembers(self.struct_id):
+            offset, name, size = member
+            #TODO if member is struct, expand struct members.
+            #TODO if member is array, expand array members.
+            cmember = CMember(address+offset, offset, name, size, idc.get_member_flag(self.struct_id, offset), idc.get_member_id(self.struct_id, offset), parent=self)
+            self.members.append(cmember)
+
+        for cmember in self.members:
+            nodz.createAttribute(node=self.node, name=str(cmember), index=-1, preset='attr_preset_1', plug=True, socket=True, dataType=str)
+        # TODO recursive search object
 
     def is_contain(self, address):
-        if self.address <= address and self.address + self.size >= address:
+        if self.address <= address <= self.address + self.size:
             return True
         return False
 
-    def show(self, depth):
-        if max_depth <= depth:
-            return
-        #if link exists link.show(depth+1)
-        pass
+
+class CObjectManager(object):
+    global pat
+    def __init__(self, nodz, max_depth, main_address, main_struct_name):
+        self.nodz = nodz
+        self.max_depth = max_depth
+        self.main_address = main_address
+        self.main_struct_name = main_struct_name
+        self.cobjects = []
+        self.cobjects.append(CObject(main_address, main_struct_name))
+
+    def debug_dump(self):
+        for cobject in self.cobjects:
+            print "CObject : " + hex(cobject.address)
+            print "=============================="
+            for member in cobject.members:
+                print member
+            print "=============================="
+
+    def is_contain(self, address):
+        for obj in self.cobjects:
+            if obj.is_contain:
+                return True
+        return False
+
 
 def object_view_main():
+    global nodz #VERY IMPORTANT!!!!
+    global max_depth
+    global dbg_active
+    #check if debugger active
+
     name,flag = ida_kernwin.get_highlight(ida_kernwin.get_current_widget())
     #check if debugger is active
     if flag == 3:
@@ -2219,21 +2338,8 @@ def object_view_main():
     struct_name = ida_kernwin.ask_str(s, 0, "Type struct")
     if not struct_name:
         return
-    '''
-    struct struc_1 -> struc_1
-    struc_1 ->  struc_1
-    '''
-    struct_name = re.sub(pat, '', struct_name)
-    struct_id = idaapi.get_struc_id(struct_name)
 
 
-    '''
-    try:
-        app = QtWidgets.QApplication([]) # IDA Pro will crash when attempt to create QApplication
-    except:
-        # I guess we're running somewhere that already has a QApp created
-        app = None
-    '''
     config_s = {
         "scene_width": 2000,
         "scene_height": 2000,
@@ -2304,7 +2410,6 @@ def object_view_main():
         }
     }
     #mainwindow = [x for x in QtWidgets.QApplication.topLevelWidgets() if type(x) == QtWidgets.QMainWindow][0]
-    global nodz #VERY IMPORTANT!!!!
     #nodz = Nodz(mainwindow, config_s) #will close immediately. fix it.(set parent?)
     nodz = Nodz(None, config_s) #will close immediately. fix it.(set parent?)
 
@@ -2331,6 +2436,16 @@ def object_view_main():
     nodz.signal_GraphEvaluated.connect(on_graphEvaluated)
 
     nodz.signal_KeyPressed.connect(on_keyPressed)
+
+    try:
+        com = CObjectManager(nodz, max_depth, address, struct_name)
+    except NotDefinedObjectException as e:
+        print e
+        print "Please report to me. X("
+        return
+    com.debug_dump()
+
+    """
     # Node A
     nodeA = nodz.createNode(name='nodeA', preset='node_preset_1', position=None)
 
@@ -2409,6 +2524,7 @@ def object_view_main():
     # Graph
     print nodz.evaluateGraph()
     print
+    """
 
 
     '''
