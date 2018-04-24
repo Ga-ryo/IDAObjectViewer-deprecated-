@@ -2239,13 +2239,30 @@ class CMember(object):
         else:
             self.type = re.sub(pat, '', self.type)
             # Struct or type defined explicitly.
-            self.value = idc.get_bytes(address, size, False)
+            if self.is_ptr:
+                self.value = u(idc.get_bytes(address, size, False), size)
+            else:
+                # handle type.
+                self.value = idc.get_bytes(address, size, False)
         # TODO
         # if self.is_ptr() -> Find CMember to which it points.(via CObjectManager?)
 
     @property
     def is_ptr(self):
         return idc.is_off0(self.flag)
+
+    @property
+    def ptr_struct_name(self):
+        """
+        Handy dereference structure name.
+        struc_x *** -> struc_x **
+        :return: structure name to which CMember point.
+        """
+        assert self.is_ptr
+        if self.type is None:
+            return None
+        assert self.type[-1] == '*'
+        return self.type[:-1].rstrip(' ')
 
     @property
     def is_struct(self):
@@ -2263,12 +2280,13 @@ class CMember(object):
 class CObject(object):
     global nodz
 
-    def __init__(self, address, struct_name):
+    def __init__(self, address, struct_name, parent=None):
         self.address = address
         self.members = []
         self.struct_name = re.sub(pat, '', struct_name)
         self.struct_id = idaapi.get_struc_id(self.struct_name)
         self.size = idc.get_struc_size(self.struct_id)
+        self.parent = parent
         self.node = nodz.createNode(name=self.struct_name+'@'+hex(self.address), preset='node_preset_1', position=None)
         if self.struct_id == idc.BADADDR:
             raise NotDefinedObjectException(self.struct_name + ' isn\'t defined. Please insert into structure window.')
@@ -2276,14 +2294,17 @@ class CObject(object):
             raise NotDefinedObjectException("Union Not supported now.")
         for member in idautils.StructMembers(self.struct_id):
             offset, name, size = member
-            #TODO if member is struct, expand struct members.
-            #TODO if member is array, expand array members.
+            # TODO if member is struct, expand struct members.
+            # TODO if member is array, expand array members.( But db array is maybe string, and user don't want it to expand... ) Only expand dd|dw|dq array?
             cmember = CMember(address+offset, offset, name, size, idc.get_member_flag(self.struct_id, offset), idc.get_member_id(self.struct_id, offset), parent=self)
             self.members.append(cmember)
 
         for cmember in self.members:
             nodz.createAttribute(node=self.node, name=str(cmember), index=-1, preset='attr_preset_1', plug=True, socket=True, dataType=str)
         # TODO recursive search object
+        for member in self.members:
+            if member.is_ptr:
+                self.parent.add_cobject(member.value, member.ptr_struct_name)
 
     def is_contain(self, address):
         if self.address <= address <= self.address + self.size:
@@ -2299,7 +2320,7 @@ class CObjectManager(object):
         self.main_address = main_address
         self.main_struct_name = main_struct_name
         self.cobjects = []
-        self.cobjects.append(CObject(main_address, main_struct_name))
+        self.add_cobject(main_address, main_struct_name)
 
     def debug_dump(self):
         for cobject in self.cobjects:
@@ -2309,7 +2330,17 @@ class CObjectManager(object):
                 print member
             print "=============================="
 
+    def add_cobject(self, address, struct_name):
+        if self.is_contain(address):
+            return
+        self.cobjects.append(CObject(address, struct_name, parent=self))
+
     def is_contain(self, address):
+        """
+
+        :param address: Memory address.
+        :return: True when object with specified address already added.
+        """
         for obj in self.cobjects:
             if obj.is_contain:
                 return True
@@ -2322,7 +2353,11 @@ def object_view_main():
     global dbg_active
     #check if debugger active
 
-    name,flag = ida_kernwin.get_highlight(ida_kernwin.get_current_widget())
+    highlighted = ida_kernwin.get_highlight(ida_kernwin.get_current_widget())
+    if highlighted is None:
+        print "No highlighted item."
+        return
+    name,flag = highlighted
     #check if debugger is active
     if flag == 3:
         #name is register name (e.g. RAX)
