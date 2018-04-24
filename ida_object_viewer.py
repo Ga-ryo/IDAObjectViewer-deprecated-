@@ -2189,17 +2189,18 @@ def on_graphEvaluated():
 def on_keyPressed(key):
     print 'key pressed : ', key
 
-def u(value):
-    global bits,endian
+
+def u(value, size):
+    global endian
     if endian == 'big':
         e = ">"
     else:
         e = "<"
-    if bits == 16:
+    if size == 2:
         return struct.unpack(e+"H", value)[0]
-    elif bits == 32:
+    elif size == 4:
         return struct.unpack(e+"I", value)[0]
-    elif bits == 64:
+    elif size == 8:
         return struct.unpack(e+"Q", value)[0]
 
 
@@ -2227,7 +2228,7 @@ class CMember(object):
 
             # Default value is integer(size=1,2,4,8).
             if (idc.is_byte(self.flag) and self.size == 1) or (idc.is_word(self.flag) and self.size == 2) or (idc.is_dword(self.flag) and self.size == 4) or (idc.is_qword(self.flag) and self.size == 8):
-                self.value = u(idc.get_bytes(address, size, False).ljust(bits/8, '\0'))
+                self.value = u(idc.get_bytes(address, size, False), size)
             else:
                 # maybe list
                 # TODO handle correctly if type isn't array (enum, bitfield, ...)
@@ -2254,9 +2255,9 @@ class CMember(object):
         # Do you want type name?
         # TODO if string, preview string?
         if type(self.value) == int:
-            return self.name + ' ' + ("0x{0:0" + str(self.size * 2) + "x}").format(self.value)
+            return self.name + '  ' + ("0x{0:0" + str(self.size * 2) + "x}").format(self.value)
         else:
-            return self.name + ' ' + "PREVIEW"
+            return self.name + '  ' + "PREVIEW"
 
 
 class CObject(object):
