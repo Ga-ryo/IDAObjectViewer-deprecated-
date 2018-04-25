@@ -2208,6 +2208,9 @@ class NotDefinedObjectException(Exception):
     def __init__(self, msg):
         super(NotDefinedObjectException, self).__init__(msg)
 
+class NoMemberFoundException(Exception):
+    def __init__(self, msg):
+        super(NoMemberFoundException, self).__init__(msg)
 
 class CMember(object):
     global bits, pat
@@ -2246,6 +2249,10 @@ class CMember(object):
                 self.value = idc.get_bytes(address, size, False)
         # TODO
         # if self.is_ptr() -> Find CMember to which it points.(via CObjectManager?)
+
+    def connect(self, cobj):
+        assert(len(cobj.members) > 0)
+        nodz.createConnection(str(self.parent), str(self), str(cobj), str(cobj.members[0]))
 
     @property
     def is_ptr(self):
@@ -2287,7 +2294,7 @@ class CObject(object):
         self.struct_id = idaapi.get_struc_id(self.struct_name)
         self.size = idc.get_struc_size(self.struct_id)
         self.parent = parent
-        self.node = nodz.createNode(name=self.struct_name+'@'+hex(self.address), preset='node_preset_1', position=None)
+        self.node = nodz.createNode(name=str(self), preset='node_preset_1', position=None)
         if self.struct_id == idc.BADADDR:
             raise NotDefinedObjectException(self.struct_name + ' isn\'t defined. Please insert into structure window.')
         if idc.is_union(self.struct_id):
@@ -2298,19 +2305,23 @@ class CObject(object):
             # TODO if member is array, expand array members.( But db array is maybe string, and user don't want it to expand... ) Only expand dd|dw|dq array?
             cmember = CMember(address+offset, offset, name, size, idc.get_member_flag(self.struct_id, offset), idc.get_member_id(self.struct_id, offset), parent=self)
             self.members.append(cmember)
+        if self.members is []:
+            raise NoMemberFoundException("No member found at " + struct_name)
 
         for cmember in self.members:
             nodz.createAttribute(node=self.node, name=str(cmember), index=-1, preset='attr_preset_1', plug=True, socket=True, dataType=str)
-        # TODO recursive search object
+
         for member in self.members:
             if member.is_ptr:
-                self.parent.add_cobject(member.value, member.ptr_struct_name)
+                member.connect(self.parent.add_cobject(member.value, member.ptr_struct_name))
 
     def is_contain(self, address):
         if self.address <= address <= self.address + self.size:
             return True
         return False
 
+    def __repr__(self):
+        return self.struct_name + '@' + hex(self.address)
 
 class CObjectManager(object):
     global pat
@@ -2333,7 +2344,9 @@ class CObjectManager(object):
     def add_cobject(self, address, struct_name):
         if self.is_contain(address):
             return
-        self.cobjects.append(CObject(address, struct_name, parent=self))
+        cobj = CObject(address, struct_name, parent=self)
+        self.cobjects.append(cobj)
+        return cobj
 
     def is_contain(self, address):
         """
