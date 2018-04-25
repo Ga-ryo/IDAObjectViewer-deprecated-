@@ -199,6 +199,7 @@ class Nodz(QtWidgets.QGraphicsView):
         # Display options.
         self.currentState = 'DEFAULT'
         self.pressedKeys = list()
+        self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
 
     def wheelEvent(self, event):
         """
@@ -247,8 +248,8 @@ class Nodz(QtWidgets.QGraphicsView):
         elif (event.button() == QtCore.Qt.LeftButton and
               event.modifiers() == QtCore.Qt.NoModifier and
               self.scene().itemAt(self.mapToScene(event.pos()), QtGui.QTransform()) is None):
-            self.currentState = 'SELECTION'
-            self._initRubberband(event.pos())
+            self.currentState = 'DRAG_WINDOW'
+            #self._initRubberband(event.pos())
             self.setInteractive(False)
 
 
@@ -365,6 +366,8 @@ class Nodz(QtWidgets.QGraphicsView):
             self.setCursor(QtCore.Qt.ArrowCursor)
             self.setInteractive(True)
 
+        elif self.currentState == 'DRAG_WINDOW':
+            self.setInteractive(True)
 
         # Selection.
         elif self.currentState == 'SELECTION':
