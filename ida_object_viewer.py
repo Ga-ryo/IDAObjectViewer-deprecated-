@@ -2343,6 +2343,7 @@ class CObject(object):
         for member in self.members:
             nodz.createAttribute(node=self.node, name=str(member), index=-1, preset='attr_preset_1', plug=True, socket=True, dataType=str)
 
+    def connect(self):
         pos = self.node.pos()
         pos.setX(self.right_end + 40) # shift right a little bit
         for member in self.members:
@@ -2363,7 +2364,7 @@ class CObject(object):
 
     def search_cmember(self, address):
         for member in self.members:
-            if member.address == address:
+            if member.address <= address < member.address + member.size:
                 return member
         return None
 
@@ -2415,6 +2416,7 @@ class CObjectManager(object):
             return
         cobj = CObject(address, struct_name, pos, cmanager=self, parent_cmember=parent_cmember)
         self.cobjects.append(cobj)
+        cobj.connect()
         return cobj
 
     def search_cmember(self, address):
