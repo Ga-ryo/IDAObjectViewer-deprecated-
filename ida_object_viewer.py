@@ -650,7 +650,8 @@ class Nodz(QtWidgets.QGraphicsView):
 
             # Set node position.
             self.scene().addItem(nodeItem)
-            nodeItem.setPos(position - nodeItem.nodeCenter)
+            #nodeItem.setPos(position - nodeItem.nodeCenter)
+            nodeItem.setPos(position)
 
             # Emit signal.
             self.signal_NodeCreated.emit(name)
@@ -2226,6 +2227,7 @@ class CMember(object):
         self.is_array = False
         self.idx = idx
         self.cobject = cobject
+        self.connected_cobject = None
         # even if use_dbg=False, get_bytes read memory from debugger. TODO check if this is true.
         if self.type is None:
             # Didn't defined type explicitly.
@@ -2251,9 +2253,9 @@ class CMember(object):
         # TODO
         # if self.is_ptr() -> Find CMember to which it points.(via CObjectManager?)
 
-    def connect(self, target_cobject):
-        assert(len(target_cobject.members) > 0)
-        nodz.createConnection(str(self.cobject), str(self), str(target_cobject), str(target_cobject.members[0]))
+    def connect(self, target_cmember):
+        self.connected_cobject = target_cmember
+        nodz.createConnection(str(self.cobject), str(self), str(target_cmember.cobject), str(target_cmember))
 
     @property
     def is_ptr(self):
@@ -2276,7 +2278,7 @@ class CMember(object):
     def is_struct(self):
         return idc.is_struct(self.flag)
 
-    @propery
+    @property
     def bottom_y(self):
         """
 
@@ -2297,7 +2299,7 @@ class CMember(object):
 class CObject(object):
     global nodz
 
-    def __init__(self, address, struct_name, cmanager=None, parent_cmember=None):
+    def __init__(self, address, struct_name, pos, cmanager=None, parent_cmember=None):
         self.address = address
         self.members = []
         self.struct_name = re.sub(pat, '', struct_name)
@@ -2306,18 +2308,12 @@ class CObject(object):
         self.cmanager = cmanager
         # set parent object
         self.parent_cmember = parent_cmember
-        if parent_cmember is None:
-            self.layout_x_index = 0
-            self.layout_y_coodinate = 0
-        else:
-            self.layout_x_index = self.parent_cmember.layout_x_index + 1
-            #self.layout_y_coodinate = self.parent_cmember.layout_y_coodinate
-
-        self.node = nodz.createNode(name=str(self), preset='node_preset_1', position=None)
+        self.node = nodz.createNode(name=str(self), preset='node_preset_1', position=pos)
         if self.struct_id == idc.BADADDR:
             raise NotDefinedObjectException(self.struct_name + ' isn\'t defined. Please insert into structure window.')
         if idc.is_union(self.struct_id):
             raise NotDefinedObjectException("Union Not supported now.")
+
         idx = 0
         for member in idautils.StructMembers(self.struct_id):
             offset, name, size = member
@@ -2329,38 +2325,67 @@ class CObject(object):
         if self.members is []:
             raise NoMemberFoundException("No member found at " + struct_name)
 
-        for cmember in self.members:
-            nodz.createAttribute(node=self.node, name=str(cmember), index=-1, preset='attr_preset_1', plug=True, socket=True, dataType=str)
+        for member in self.members:
+            nodz.createAttribute(node=self.node, name=str(member), index=-1, preset='attr_preset_1', plug=True, socket=True, dataType=str)
 
+        pos = self.node.pos()
+        pos.setX(self.right_end + 40) # shift right a little bit
         for member in self.members:
             if member.is_ptr:
-                member.connect(self.cmanager.add_cobject(member.value, member.ptr_struct_name, parent_cmember=member))
+                if self.cmanager.is_contain(member.value):
+                    # address already exists.
+                    member.connect(self.cmanager.search_cmember(member.value))
+                else:
+                    # create cobject
+                    cobj = self.cmanager.add_cobject(member.value, member.ptr_struct_name, pos, parent_cmember=member)
+                    member.connect(cobj.members[0]) # connect to top member
+                    pos.setY(cobj.bottom_y + 40) # shift down a little bit
 
     def is_contain(self, address):
         if self.address <= address <= self.address + self.size:
             return True
         return False
 
-    @propery
+    def search_cmember(self, address):
+        for member in self.members:
+            if member.address == address:
+                return member
+        return None
+
+    @property
+    def right_end(self):
+        """
+
+        :return:
+        """
+        return self.node.pos().x() + self.node.width
+
+    @property
     def bottom_y(self):
         """
 
         :return: max(self.bottom, max(self.childlen's bottom))
         """
-        pass
+        bottom = self.node.pos().y() + self.node.height
+        for member in self.members:
+            if member.is_ptr:
+                bottom = max(bottom, member.connected_cobject.bottom_y)
+        return bottom
 
     def __repr__(self):
         return self.struct_name + '@' + hex(self.address)
 
+
 class CObjectManager(object):
     global pat
+
     def __init__(self, nodz, max_depth, main_address, main_struct_name):
         self.nodz = nodz
         self.max_depth = max_depth
         self.main_address = main_address
         self.main_struct_name = main_struct_name
         self.cobjects = []
-        self.add_cobject(main_address, main_struct_name)
+        self.add_cobject(main_address, main_struct_name, None)
 
     def debug_dump(self):
         for cobject in self.cobjects:
@@ -2370,12 +2395,22 @@ class CObjectManager(object):
                 print member
             print "=============================="
 
-    def add_cobject(self, address, struct_name, parent_cmember=None):
+    def add_cobject(self, address, struct_name, pos, parent_cmember=None):
         if self.is_contain(address):
             return
-        cobj = CObject(address, struct_name, cmanager=self, parent_cmember=parent_cmember)
+        cobj = CObject(address, struct_name, pos, cmanager=self, parent_cmember=parent_cmember)
         self.cobjects.append(cobj)
         return cobj
+
+    def search_cmember(self, address):
+        obj = self.search_cobject(address)
+        return obj.search_cmember(address)
+
+    def search_cobject(self, address):
+        for obj in self.cobjects:
+            if obj.is_contain(address):
+                return obj
+        return None
 
     def is_contain(self, address):
         """
@@ -2384,12 +2419,13 @@ class CObjectManager(object):
         :return: True when object with specified address already added.
         """
         for obj in self.cobjects:
-            if obj.is_contain:
+            if obj.is_contain(address):
                 return True
         return False
 
     def auto_layout(self):
-        pass
+        for cobject in self.cobjects:
+            print cobject.bottom_y
 
 def object_view_main():
     global nodz #VERY IMPORTANT!!!!
