@@ -2351,7 +2351,7 @@ class CObject(object):
                     pos.setY(cobj.bottom_y + 40) # shift down a little bit
 
     def is_contain(self, address):
-        if self.address <= address <= self.address + self.size:
+        if self.address <= address < self.address + self.size:
             return True
         return False
 
