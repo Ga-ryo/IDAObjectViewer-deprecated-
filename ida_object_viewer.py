@@ -649,7 +649,10 @@ class Nodz(QtWidgets.QGraphicsView):
 
             if not position:
                 # Get the center of the view.
-                position = self.mapToScene(self.viewport().rect().center())
+                p = self.viewport().rect().topLeft()
+                p.setX(p.x() + 50)
+                p.setY(p.y() + 50)
+                position = self.mapToScene(p)
 
             # Set node position.
             self.scene().addItem(nodeItem)
