@@ -2213,9 +2213,9 @@ class NoMemberFoundException(Exception):
         super(NoMemberFoundException, self).__init__(msg)
 
 class CMember(object):
-    global bits, pat
+    global bits, pat, nodz
 
-    def __init__(self, address, offset, name, size, flag, member_id, parent=None):
+    def __init__(self, address, offset, name, size, flag, member_id, idx, cobject=None):
         self.address = address
         self.offset = offset
         self.name = name
@@ -2224,7 +2224,8 @@ class CMember(object):
         self.member_id = member_id
         self.type = idc.get_type(self.member_id)
         self.is_array = False
-        self.parent = parent
+        self.idx = idx
+        self.cobject = cobject
         # even if use_dbg=False, get_bytes read memory from debugger. TODO check if this is true.
         if self.type is None:
             # Didn't defined type explicitly.
@@ -2250,9 +2251,9 @@ class CMember(object):
         # TODO
         # if self.is_ptr() -> Find CMember to which it points.(via CObjectManager?)
 
-    def connect(self, cobj):
-        assert(len(cobj.members) > 0)
-        nodz.createConnection(str(self.parent), str(self), str(cobj), str(cobj.members[0]))
+    def connect(self, target_cobject):
+        assert(len(target_cobject.members) > 0)
+        nodz.createConnection(str(self.cobject), str(self), str(target_cobject), str(target_cobject.members[0]))
 
     @property
     def is_ptr(self):
@@ -2275,6 +2276,15 @@ class CMember(object):
     def is_struct(self):
         return idc.is_struct(self.flag)
 
+    @propery
+    def bottom_y(self):
+        """
+
+        :return: max(self.bottom, max(self.childlen's bottom))
+        """
+        if self.idx == 0:
+            return self.cobject.node.pos().y()
+
     def __repr__(self):
         # Do you want type name?
         # TODO if string, preview string?
@@ -2287,24 +2297,35 @@ class CMember(object):
 class CObject(object):
     global nodz
 
-    def __init__(self, address, struct_name, parent=None):
+    def __init__(self, address, struct_name, cmanager=None, parent_cmember=None):
         self.address = address
         self.members = []
         self.struct_name = re.sub(pat, '', struct_name)
         self.struct_id = idaapi.get_struc_id(self.struct_name)
         self.size = idc.get_struc_size(self.struct_id)
-        self.parent = parent
+        self.cmanager = cmanager
+        # set parent object
+        self.parent_cmember = parent_cmember
+        if parent_cmember is None:
+            self.layout_x_index = 0
+            self.layout_y_coodinate = 0
+        else:
+            self.layout_x_index = self.parent_cmember.layout_x_index + 1
+            #self.layout_y_coodinate = self.parent_cmember.layout_y_coodinate
+
         self.node = nodz.createNode(name=str(self), preset='node_preset_1', position=None)
         if self.struct_id == idc.BADADDR:
             raise NotDefinedObjectException(self.struct_name + ' isn\'t defined. Please insert into structure window.')
         if idc.is_union(self.struct_id):
             raise NotDefinedObjectException("Union Not supported now.")
+        idx = 0
         for member in idautils.StructMembers(self.struct_id):
             offset, name, size = member
             # TODO if member is struct, expand struct members.
             # TODO if member is array, expand array members.( But db array is maybe string, and user don't want it to expand... ) Only expand dd|dw|dq array?
-            cmember = CMember(address+offset, offset, name, size, idc.get_member_flag(self.struct_id, offset), idc.get_member_id(self.struct_id, offset), parent=self)
+            cmember = CMember(address + offset, offset, name, size, idc.get_member_flag(self.struct_id, offset), idc.get_member_id(self.struct_id, offset), idx, cobject=self)
             self.members.append(cmember)
+            idx += 1
         if self.members is []:
             raise NoMemberFoundException("No member found at " + struct_name)
 
@@ -2313,12 +2334,20 @@ class CObject(object):
 
         for member in self.members:
             if member.is_ptr:
-                member.connect(self.parent.add_cobject(member.value, member.ptr_struct_name))
+                member.connect(self.cmanager.add_cobject(member.value, member.ptr_struct_name, parent_cmember=member))
 
     def is_contain(self, address):
         if self.address <= address <= self.address + self.size:
             return True
         return False
+
+    @propery
+    def bottom_y(self):
+        """
+
+        :return: max(self.bottom, max(self.childlen's bottom))
+        """
+        pass
 
     def __repr__(self):
         return self.struct_name + '@' + hex(self.address)
@@ -2341,10 +2370,10 @@ class CObjectManager(object):
                 print member
             print "=============================="
 
-    def add_cobject(self, address, struct_name):
+    def add_cobject(self, address, struct_name, parent_cmember=None):
         if self.is_contain(address):
             return
-        cobj = CObject(address, struct_name, parent=self)
+        cobj = CObject(address, struct_name, cmanager=self, parent_cmember=parent_cmember)
         self.cobjects.append(cobj)
         return cobj
 
@@ -2359,6 +2388,8 @@ class CObjectManager(object):
                 return True
         return False
 
+    def auto_layout(self):
+        pass
 
 def object_view_main():
     global nodz #VERY IMPORTANT!!!!
@@ -2488,6 +2519,7 @@ def object_view_main():
 
     try:
         com = CObjectManager(nodz, max_depth, address, struct_name)
+        com.auto_layout()
     except NotDefinedObjectException as e:
         print e
         print "Please report to me. X("
