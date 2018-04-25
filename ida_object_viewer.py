@@ -2262,6 +2262,15 @@ class CMember(object):
         return idc.is_off0(self.flag)
 
     @property
+    def is_valid_ptr(self):
+        """
+
+        :return:
+        """
+        global bits
+        return self.is_ptr and idc.is_mapped(self.value)
+
+    @property
     def ptr_struct_name(self):
         """
         Handy dereference structure name.
@@ -2290,7 +2299,7 @@ class CMember(object):
     def __repr__(self):
         # Do you want type name?
         # TODO if string, preview string?
-        if type(self.value) == int:
+        if isinstance(self.value, (int, long)):
             return self.name + '  ' + ("0x{0:0" + str(self.size * 2) + "x}").format(self.value)
         else:
             return self.name + '  ' + "PREVIEW"
@@ -2314,7 +2323,7 @@ class CObject(object):
         if idc.is_union(self.struct_id):
             raise NotDefinedObjectException("Union Not supported now.")
 
-        idx = 0
+        idx = 0 # TODO remove this and bottom_y of CMember
         for member in idautils.StructMembers(self.struct_id):
             offset, name, size = member
             # TODO if member is struct, expand struct members.
@@ -2331,7 +2340,7 @@ class CObject(object):
         pos = self.node.pos()
         pos.setX(self.right_end + 40) # shift right a little bit
         for member in self.members:
-            if member.is_ptr:
+            if member.is_valid_ptr:
                 if self.cmanager.is_contain(member.value):
                     # address already exists.
                     member.connect(self.cmanager.search_cmember(member.value))
@@ -2368,7 +2377,7 @@ class CObject(object):
         """
         bottom = self.node.pos().y() + self.node.height
         for member in self.members:
-            if member.is_ptr:
+            if member.is_valid_ptr:
                 bottom = max(bottom, member.connected_cobject.bottom_y)
         return bottom
 
